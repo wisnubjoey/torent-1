@@ -1,0 +1,571 @@
+# OpenAPI Contract for Vehicle Rental Web Application
+
+openapi: 3.0.0
+info:
+  title: Vehicle Rental API
+  version: 1.0.0
+  description: API for vehicle rental web application
+
+servers:
+  - url: https://api.vehicle-rental-app.com
+    description: Production server
+
+paths:
+  /api/auth/register:
+    post:
+      summary: Register a new user
+      description: Creates a new user account with phone number verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                password:
+                  type: string
+              required:
+                - name
+                - phone
+                - password
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /api/auth/login:
+    post:
+      summary: Authenticate user
+      description: Authenticates user with phone number and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone:
+                  type: string
+                password:
+                  type: string
+              required:
+                - phone
+                - password
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+        '401':
+          description: Invalid credentials
+
+  /api/vehicles:
+    get:
+      summary: Get all available vehicles
+      description: Returns a list of all available vehicles with filtering options
+      parameters:
+        - name: type
+          in: query
+          description: Filter by vehicle type (motorcycle, car)
+          schema:
+            type: string
+        - name: badge
+          in: query
+          description: Filter by vehicle badge (luxury, sport, city, touring, etc.)
+          schema:
+            type: string
+        - name: category
+          in: query
+          description: Filter by vehicle category
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of vehicles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vehicle'
+                  links:
+                    $ref: '#/components/schemas/PaginationLinks'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /api/vehicles/{id}:
+    get:
+      summary: Get vehicle details
+      description: Returns detailed information about a specific vehicle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Vehicle ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Vehicle details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+        '404':
+          description: Vehicle not found
+
+  /api/packages:
+    get:
+      summary: Get all available packages
+      description: Returns a list of all available rental packages
+      responses:
+        '200':
+          description: List of packages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Package'
+
+  /api/rentals/check-availability:
+    post:
+      summary: Check vehicle availability
+      description: Check if a vehicle is available for specific dates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vehicle_id:
+                  type: integer
+                start_date:
+                  type: string
+                  format: date
+                end_date:
+                  type: string
+                  format: date
+              required:
+                - vehicle_id
+                - start_date
+                - end_date
+      responses:
+        '200':
+          description: Availability check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  is_available:
+                    type: boolean
+                  message:
+                    type: string
+                  alternatives:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vehicle'
+        '400':
+          description: Invalid date range
+
+  /api/rentals:
+    post:
+      summary: Create a new rental order
+      description: Creates a new rental order with specified dates and vehicle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vehicle_id:
+                  type: integer
+                package_id:
+                  type: integer
+                  nullable: true
+                start_date:
+                  type: string
+                  format: date
+                end_date:
+                  type: string
+                  format: date
+                rental_period_type:
+                  type: string
+                  enum: [day, week, month]
+              required:
+                - vehicle_id
+                - start_date
+                - end_date
+                - rental_period_type
+      responses:
+        '201':
+          description: Rental order created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  rental_order:
+                    $ref: '#/components/schemas/RentalOrder'
+        '400':
+          description: Invalid dates or vehicle not available
+        '401':
+          description: Unauthorized
+
+  /api/rentals/my-rentals:
+    get:
+      summary: Get user's rental history
+      description: Returns all rentals for the authenticated user
+      responses:
+        '200':
+          description: User's rental history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserRental'
+                  links:
+                    $ref: '#/components/schemas/PaginationLinks'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          description: Unauthorized
+
+  /api/admin/vehicles:
+    get:
+      summary: Get all vehicles (admin)
+      description: Returns all vehicles with admin capabilities
+      responses:
+        '200':
+          description: List of all vehicles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vehicle'
+                  links:
+                    $ref: '#/components/schemas/PaginationLinks'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+    post:
+      summary: Add a new vehicle (admin)
+      description: Allows admin to add a new vehicle to the inventory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/Vehicle'
+      responses:
+        '201':
+          description: Vehicle created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  vehicle:
+                    $ref: '#/components/schemas/Vehicle'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+
+  /api/admin/rentals:
+    get:
+      summary: Get all rental orders (admin)
+      description: Returns all rental orders with admin capabilities
+      responses:
+        '200':
+          description: List of all rental orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminRentalOrder'
+                  links:
+                    $ref: '#/components/schemas/PaginationLinks'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+
+  /api/admin/calendar:
+    get:
+      summary: Get vehicle availability calendar (admin)
+      description: Returns calendar view of vehicle availability
+      parameters:
+        - name: month
+          in: query
+          description: Month for calendar view (YYYY-MM)
+          schema:
+            type: string
+        - name: vehicle_id
+          in: query
+          description: Optional vehicle ID to filter calendar
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Calendar data for vehicles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  calendar:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CalendarItem'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [motorcycle, car]
+        badge:
+          type: string
+          enum: [luxury, sport, city, touring]
+        description:
+          type: string
+        daily_rate:
+          type: number
+          format: decimal
+        weekly_rate:
+          type: number
+          format: decimal
+        monthly_rate:
+          type: number
+          format: decimal
+        is_available:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Package:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        discount_percentage:
+          type: number
+          format: decimal
+        additional_features:
+          type: object
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    RentalOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        vehicle_id:
+          type: integer
+        package_id:
+          type: integer
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        total_amount:
+          type: number
+          format: decimal
+        rental_period_type:
+          type: string
+          enum: [day, week, month]
+        status:
+          type: string
+          enum: [pending, confirmed, active, completed, cancelled]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserRental:
+      allOf:
+        - $ref: '#/components/schemas/RentalOrder'
+        - type: object
+          properties:
+            vehicle:
+              $ref: '#/components/schemas/Vehicle'
+
+    AdminRentalOrder:
+      allOf:
+        - $ref: '#/components/schemas/RentalOrder'
+        - type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            vehicle:
+              $ref: '#/components/schemas/Vehicle'
+            package:
+              $ref: '#/components/schemas/Package'
+
+    CalendarItem:
+      type: object
+      properties:
+        vehicle_id:
+          type: integer
+        date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [available, booked, maintenance]
+        rental_order_id:
+          type: integer
+
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    PaginationLinks:
+      type: object
+      properties:
+        first:
+          type: string
+          nullable: true
+        last:
+          type: string
+          nullable: true
+        prev:
+          type: string
+          nullable: true
+        next:
+          type: string
+          nullable: true
+
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        from:
+          type: integer
+        last_page:
+          type: integer
+        path:
+          type: string
+        per_page:
+          type: integer
+        to:
+          type: integer
+        total:
+          type: integer
